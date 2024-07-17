@@ -9,13 +9,26 @@ import { UpdatePokemonDto } from './dto/update-pokemon.dto';
 import { isValidObjectId, Model } from 'mongoose';
 import { Pokemon } from './entities/pokemon.entity';
 import { InjectModel } from '@nestjs/mongoose';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PokemonService {
+  // Defino una propiedad de la clase para defaultLimit para poder reasignar dentro del constructor
+  private defaultLimit: number;
+
   constructor(
-    @InjectModel(Pokemon.name) //Decorador que inyecta el modelo de Pokemon al servicio
+    // Decorador que inyecta el modelo de Pokemon al servicio
+    @InjectModel(Pokemon.name)
     private readonly pokemonModel: Model<Pokemon>,
-  ) {}
+
+    // Inyecto dependencia ConfigService para generar una instancia y usar: por ej config.get("<nombreVariable>")
+    private readonly configService: ConfigService,
+  ) {
+    // Reasigno la variable defaultLimit con el valor que obtiene de la configuración de variables de entrorno en app.config.ts
+    this.defaultLimit = configService.get<number>('defaultLimit');
+    // console.log({ defaultLimit: configService.get<number>('defaultLimit') });
+  }
 
   async create(createPokemonDto: CreatePokemonDto) {
     createPokemonDto.name = createPokemonDto.name.toLocaleLowerCase();
@@ -28,8 +41,17 @@ export class PokemonService {
     }
   }
 
-  async findAll() {
-    return await this.pokemonModel.find();
+  async findAll(paginationDto: PaginationDto) {
+    const { limit = this.defaultLimit, offset = 0 } = paginationDto;
+
+    return this.pokemonModel
+      .find()
+      .limit(limit)
+      .skip(offset)
+      .sort({
+        no: 1,
+      })
+      .select('-__v');
   }
 
   async findOne(term: string) {
